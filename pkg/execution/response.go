@@ -36,3 +36,5 @@ type ResultNewPayloadV1 struct {
 type ResultGetBlockByNumber *json.RawMessage
 
 type ResultChainID string
+
+type ResultexchangeCapabilities []string
