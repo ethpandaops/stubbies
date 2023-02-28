@@ -9,6 +9,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var ErrUnsupportedGetBlockQuery = errors.New("unsupported get block query")
+
 type Handler struct {
 	log logrus.FieldLogger
 	Cfg Config
@@ -49,63 +51,126 @@ func (h *Handler) Request(ctx context.Context, id int, method string, params []*
 			TerminalBlockNumber:     h.Cfg.TerminalBlockNumber,
 		}
 	case "engine_forkchoiceUpdatedV1":
-		if len(params) < 1 || params[0] == nil {
-			return nil, errors.New("missing params")
-		}
-
-		var forkchoiceState RequestParamsForkchoiceUpdatedV1
-
-		err := json.Unmarshal([]byte(*params[0]), &forkchoiceState)
+		result, err := h.forkChoiceUpdated(params)
 		if err != nil {
 			return nil, err
 		}
 
-		resp.Result = ResultForkchoiceUpdatedV1{
-			PayloadStatus: ResultForkchoiceUpdatedV1PayloadStatus{
-				Status:          "VALID",
-				LatestValidHash: forkchoiceState.HeadBlockHash,
-				ValidationError: "",
-			},
-			PayloadID: "0xa247243752eb10b4",
+		resp.Result = result
+	case "engine_forkchoiceUpdatedV2":
+		result, err := h.forkChoiceUpdated(params)
+		if err != nil {
+			return nil, err
 		}
+
+		resp.Result = result
 	case "engine_newPayloadV1":
+		result, err := h.newPayload(params)
+		if err != nil {
+			return nil, err
+		}
+
+		resp.Result = result
+	case "engine_newPayloadV2":
+		result, err := h.newPayload(params)
+		if err != nil {
+			return nil, err
+		}
+
+		resp.Result = result
+	case "eth_getBlockByNumber":
+		result, err := h.getBlock(params)
+		if err != nil && err != ErrUnsupportedGetBlockQuery {
+			return nil, err
+		}
+
+		resp.Result = result
+	case "eth_getBlockByHash":
+		result, err := h.getBlock(params)
+		if err != nil && err != ErrUnsupportedGetBlockQuery {
+			return nil, err
+		}
+
+		resp.Result = result
+	case "eth_chainId":
+		resp.Result = ResultChainID(h.Cfg.ChainID)
+	case "engine_exchangeCapabilities":
 		if len(params) < 1 || params[0] == nil {
 			return nil, errors.New("missing params")
 		}
 
-		var payload RequestParamsNewPayloadV1
+		var payload RequestParamsExchangeCapabilities
 
 		err := json.Unmarshal([]byte(*params[0]), &payload)
 		if err != nil {
 			return nil, err
 		}
 
-		h.latestBlock.UpdateToLatest(payload, params[0])
-
-		resp.Result = ResultNewPayloadV1{
-			Status:          "VALID",
-			LatestValidHash: payload.BlockHash,
-			ValidationError: "",
-		}
-	case "eth_getBlockByNumber":
-		if len(params) < 1 || params[0] == nil {
-			return nil, errors.New("missing params")
-		}
-
-		var query string
-
-		err := json.Unmarshal([]byte(*params[0]), &query)
-		if err != nil {
-			return nil, err
-		}
-
-		if query != "latest" {
-			resp.Result = ResultGetBlockByNumber(h.latestBlock.raw)
-		}
-	case "eth_chainId":
-		resp.Result = ResultChainID(h.Cfg.ChainID)
+		resp.Result = ResultexchangeCapabilities(payload)
 	default:
 	}
 
 	return resp, nil
+}
+
+func (h *Handler) forkChoiceUpdated(params []*json.RawMessage) (interface{}, error) {
+	if len(params) < 1 || params[0] == nil {
+		return nil, errors.New("missing params")
+	}
+
+	var forkchoiceState RequestParamsForkchoiceUpdatedV1
+
+	err := json.Unmarshal([]byte(*params[0]), &forkchoiceState)
+	if err != nil {
+		return nil, err
+	}
+
+	return ResultForkchoiceUpdatedV1{
+		PayloadStatus: ResultForkchoiceUpdatedV1PayloadStatus{
+			Status:          "VALID",
+			LatestValidHash: forkchoiceState.HeadBlockHash,
+			ValidationError: "",
+		},
+		PayloadID: "0xa247243752eb10b4",
+	}, nil
+}
+
+func (h *Handler) newPayload(params []*json.RawMessage) (interface{}, error) {
+	if len(params) < 1 || params[0] == nil {
+		return nil, errors.New("missing params")
+	}
+
+	var payload RequestParamsNewPayloadV1
+
+	err := json.Unmarshal([]byte(*params[0]), &payload)
+	if err != nil {
+		return nil, err
+	}
+
+	h.latestBlock.UpdateToLatest(payload, params[0])
+
+	return ResultNewPayloadV1{
+		Status:          "VALID",
+		LatestValidHash: payload.BlockHash,
+		ValidationError: "",
+	}, nil
+}
+
+func (h *Handler) getBlock(params []*json.RawMessage) (interface{}, error) {
+	if len(params) < 1 || params[0] == nil {
+		return nil, errors.New("missing params")
+	}
+
+	var query string
+
+	err := json.Unmarshal([]byte(*params[0]), &query)
+	if err != nil {
+		return nil, err
+	}
+
+	if query == "latest" {
+		return ResultGetBlockByNumber(h.latestBlock.raw), nil
+	}
+
+	return nil, ErrUnsupportedGetBlockQuery
 }

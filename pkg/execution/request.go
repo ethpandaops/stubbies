@@ -8,3 +8,5 @@ type RequestParamsNewPayloadV1 struct {
 	BlockHash   string `json:"blockHash"`
 	BlockNumber string `json:"blockNumber"`
 }
+
+type RequestParamsExchangeCapabilities []string

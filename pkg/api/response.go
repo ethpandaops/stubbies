@@ -9,7 +9,8 @@ type ContentTypeResolver func() ([]byte, error)
 type ContentTypeResolvers map[ContentType]ContentTypeResolver
 
 type HTTPResponse struct {
-	resolvers  ContentTypeResolvers
+	resolvers ContentTypeResolvers
+	//nolint:tagliatelle // spec requires this field to be named "status_code"
 	StatusCode int               `json:"status_code"`
 	Headers    map[string]string `json:"headers"`
 	ExtraData  map[string]interface{}
