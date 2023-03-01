@@ -1,7 +1,5 @@
 package execution
 
-import "encoding/json"
-
 type Response struct {
 	ID      int         `json:"id"`
 	JSONRPC string      `json:"jsonrpc"`
@@ -33,8 +31,20 @@ type ResultNewPayloadV1 struct {
 	ValidationError string `json:"validationError"`
 }
 
-type ResultGetBlockByNumber *json.RawMessage
-
 type ResultChainID string
 
 type ResultexchangeCapabilities []string
+
+type ResultGetBlock struct {
+	Number       string   `json:"number"`
+	Hash         string   `json:"hash"`
+	ParentHash   string   `json:"parentHash"`
+	LogsBloom    string   `json:"logsBloom"`
+	StateRoot    string   `json:"stateRoot"`
+	ReceiptsRoot string   `json:"receiptsRoot"`
+	ExtraData    string   `json:"extraData"`
+	GasLimit     string   `json:"gasLimit"`
+	GasUsed      string   `json:"gasUsed"`
+	Timestamp    string   `json:"timestamp"`
+	Transactions []string `json:"transactions"`
+}
