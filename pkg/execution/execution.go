@@ -78,13 +78,6 @@ func (h *Handler) Request(ctx context.Context, id int, method string, params []*
 		}
 
 		resp.Result = result
-	case "eth_getBlockByNumber":
-		result, err := h.getBlock(params)
-		if err != nil && err != ErrUnsupportedGetBlockQuery {
-			return nil, err
-		}
-
-		resp.Result = result
 	case "eth_getBlockByHash":
 		result, err := h.getBlock(params)
 		if err != nil && err != ErrUnsupportedGetBlockQuery {
@@ -147,7 +140,7 @@ func (h *Handler) newPayload(params []*json.RawMessage) (interface{}, error) {
 		return nil, err
 	}
 
-	h.latestBlock.UpdateToLatest(payload, params[0])
+	h.latestBlock.UpdateToLatest(&payload, params[0])
 
 	return ResultNewPayloadV1{
 		Status:          "VALID",
@@ -169,7 +162,7 @@ func (h *Handler) getBlock(params []*json.RawMessage) (interface{}, error) {
 	}
 
 	if query == "latest" {
-		return ResultGetBlockByNumber(h.latestBlock.raw), nil
+		return h.latestBlock.GetResult(), nil
 	}
 
 	return nil, ErrUnsupportedGetBlockQuery
