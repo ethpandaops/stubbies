@@ -15,8 +15,8 @@ func (b *Block) UpdateToLatest(payload *RequestParamsNewPayloadV1, raw *json.Raw
 	num := new(big.Int)
 	num.SetString(payload.BlockNumber[2:], 16)
 
-	// replace if the new block is higher
-	if num.Cmp(b.Number) > 0 {
+	// replace if the new block is higher or equal to the current one
+	if num.Cmp(b.Number) >= 0 {
 		b.Number = num
 		b.raw = raw
 		b.payload = payload
