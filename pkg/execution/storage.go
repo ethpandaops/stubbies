@@ -104,8 +104,6 @@ func (s *Storage) AddBlock(payload *RequestParamsNewPayloadV1, raw *json.RawMess
 		payload: payload,
 	}
 
-	s.log.WithField("number", num).Error("Adding block to storage")
-
 	s.hashMap[block.payload.BlockHash] = block
 	s.numberMap[num] = block
 
