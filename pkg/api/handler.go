@@ -38,6 +38,10 @@ func (h *Handler) Register(ctx context.Context, router *httprouter.Router) error
 	return nil
 }
 
+func (h *Handler) Start(ctx context.Context) {
+	h.execution.Start(ctx)
+}
+
 func deriveRegisteredPath(request *http.Request, ps httprouter.Params) string {
 	registeredPath := request.URL.Path
 	for _, param := range ps {

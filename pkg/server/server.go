@@ -36,6 +36,8 @@ func NewServer(log *logrus.Logger, conf *Config) *Server {
 func (s *Server) Start(ctx context.Context) error {
 	s.log.Infof("starting stubbies server")
 
+	s.http.Start(ctx)
+
 	router := httprouter.New()
 
 	if err := s.http.Register(ctx, router); err != nil {

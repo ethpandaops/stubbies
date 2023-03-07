@@ -11,18 +11,6 @@ type Block struct {
 	payload *RequestParamsNewPayloadV1
 }
 
-func (b *Block) UpdateToLatest(payload *RequestParamsNewPayloadV1, raw *json.RawMessage) {
-	num := new(big.Int)
-	num.SetString(payload.BlockNumber[2:], 16)
-
-	// replace if the new block is higher or equal to the current one
-	if num.Cmp(b.Number) >= 0 {
-		b.Number = num
-		b.raw = raw
-		b.payload = payload
-	}
-}
-
 func (b *Block) GetResult() *ResultGetBlock {
 	if b.payload == nil {
 		return nil
