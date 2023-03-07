@@ -15,7 +15,7 @@ type Handler struct {
 	log logrus.FieldLogger
 	Cfg Config
 
-	latestBlock Block
+	storage *Storage
 }
 
 // NewHandler returns a new Handler instance.
@@ -25,13 +25,14 @@ func NewHandler(log logrus.FieldLogger, conf *Config) *Handler {
 	}
 
 	return &Handler{
-		log: log.WithField("module", "api/execution"),
-		Cfg: *conf,
-		latestBlock: Block{
-			Number: big.NewInt(0),
-			raw:    nil,
-		},
+		log:     log.WithField("module", "api/execution"),
+		Cfg:     *conf,
+		storage: newStorage(log.WithField("module", "api/execution/storage")),
 	}
+}
+
+func (h *Handler) Start(ctx context.Context) {
+	h.storage.Start(ctx)
 }
 
 func (h *Handler) Request(ctx context.Context, id int, method string, params []*json.RawMessage) (*Response, error) {
@@ -79,7 +80,14 @@ func (h *Handler) Request(ctx context.Context, id int, method string, params []*
 
 		resp.Result = result
 	case "eth_getBlockByHash":
-		result, err := h.getBlock(params)
+		result, err := h.getBlockByHash(params)
+		if err != nil && err != ErrUnsupportedGetBlockQuery {
+			return nil, err
+		}
+
+		resp.Result = result
+	case "eth_getBlockByNumber":
+		result, err := h.getBlockByNumber(params)
 		if err != nil && err != ErrUnsupportedGetBlockQuery {
 			return nil, err
 		}
@@ -100,7 +108,9 @@ func (h *Handler) Request(ctx context.Context, id int, method string, params []*
 		}
 
 		resp.Result = ResultexchangeCapabilities(payload)
+	case "eth_call":
 	default:
+		h.log.WithField("method", method).Warn("unsupported method")
 	}
 
 	return resp, nil
@@ -140,7 +150,7 @@ func (h *Handler) newPayload(params []*json.RawMessage) (interface{}, error) {
 		return nil, err
 	}
 
-	h.latestBlock.UpdateToLatest(&payload, params[0])
+	h.storage.AddBlock(&payload, params[0])
 
 	return ResultNewPayloadV1{
 		Status:          "VALID",
@@ -149,7 +159,7 @@ func (h *Handler) newPayload(params []*json.RawMessage) (interface{}, error) {
 	}, nil
 }
 
-func (h *Handler) getBlock(params []*json.RawMessage) (interface{}, error) {
+func (h *Handler) getBlockByHash(params []*json.RawMessage) (interface{}, error) {
 	if len(params) < 1 || params[0] == nil {
 		return nil, errors.New("missing params")
 	}
@@ -162,7 +172,44 @@ func (h *Handler) getBlock(params []*json.RawMessage) (interface{}, error) {
 	}
 
 	if query == "latest" {
-		return h.latestBlock.GetResult(), nil
+		block := h.storage.GetLatestBlock()
+		if block != nil {
+			return block.GetResult(), nil
+		}
+	} else {
+		block := h.storage.GetBlockByHash(query)
+		if block != nil {
+			return block.GetResult(), nil
+		}
+	}
+
+	return "{}", ErrUnsupportedGetBlockQuery
+}
+
+func (h *Handler) getBlockByNumber(params []*json.RawMessage) (interface{}, error) {
+	if len(params) < 1 || params[0] == nil {
+		return nil, errors.New("missing params")
+	}
+
+	var query string
+
+	err := json.Unmarshal([]byte(*params[0]), &query)
+	if err != nil {
+		return nil, err
+	}
+
+	if query == "latest" {
+		block := h.storage.GetLatestBlock()
+		if block != nil {
+			return block.GetResult(), nil
+		}
+	} else {
+		number := new(big.Int)
+		number.SetString(query[2:], 16)
+		block := h.storage.GetBlockByNumber(number)
+		if block != nil {
+			return block.GetResult(), nil
+		}
 	}
 
 	return nil, ErrUnsupportedGetBlockQuery
