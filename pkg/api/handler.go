@@ -70,12 +70,12 @@ func (h *Handler) wrappedHandler(handler func(ctx context.Context, r *http.Reque
 
 		h.metrics.ObserveRequest(r.Method, registeredPath, executionMethod)
 
-		response := &HTTPResponse{}
+		responseStatusCode := http.StatusInternalServerError
 
 		var err error
 
 		defer func() {
-			h.metrics.ObserveResponse(r.Method, registeredPath, fmt.Sprintf("%v", response.StatusCode), contentType.String(), executionMethod, time.Since(start))
+			h.metrics.ObserveResponse(r.Method, registeredPath, fmt.Sprintf("%v", responseStatusCode), contentType.String(), executionMethod, time.Since(start))
 		}()
 
 		decoder := json.NewDecoder(r.Body)
@@ -84,7 +84,8 @@ func (h *Handler) wrappedHandler(handler func(ctx context.Context, r *http.Reque
 
 		err = decoder.Decode(&body)
 		if err != nil {
-			if writeErr := WriteErrorResponse(w, err.Error(), response.StatusCode); writeErr != nil {
+			responseStatusCode = http.StatusBadRequest
+			if writeErr := WriteErrorResponse(w, err.Error(), responseStatusCode); writeErr != nil {
 				h.log.WithError(writeErr).Error("Failed to decode request body")
 			}
 
@@ -92,7 +93,8 @@ func (h *Handler) wrappedHandler(handler func(ctx context.Context, r *http.Reque
 		}
 
 		if body.Method == "" {
-			if writeErr := WriteErrorResponse(w, "Missing method", http.StatusBadRequest); writeErr != nil {
+			responseStatusCode = http.StatusBadRequest
+			if writeErr := WriteErrorResponse(w, "Missing method", responseStatusCode); writeErr != nil {
 				h.log.WithError(writeErr).Error("Request body missing method")
 			}
 
@@ -101,18 +103,25 @@ func (h *Handler) wrappedHandler(handler func(ctx context.Context, r *http.Reque
 
 		executionMethod = body.Method
 
-		response, err = handler(ctx, r, p, contentType, &body)
+		response, err := handler(ctx, r, p, contentType, &body)
 		if err != nil {
-			if writeErr := WriteErrorResponse(w, err.Error(), response.StatusCode); writeErr != nil {
+			if response != nil && response.StatusCode != 0 {
+				responseStatusCode = response.StatusCode
+			}
+
+			if writeErr := WriteErrorResponse(w, err.Error(), responseStatusCode); writeErr != nil {
 				h.log.WithError(writeErr).Error("Failed to write error response")
 			}
 
 			return
 		}
 
+		responseStatusCode = response.StatusCode
+
 		data, err := response.MarshalAs(contentType)
 		if err != nil {
-			if writeErr := WriteErrorResponse(w, err.Error(), http.StatusInternalServerError); writeErr != nil {
+			responseStatusCode = http.StatusInternalServerError
+			if writeErr := WriteErrorResponse(w, err.Error(), responseStatusCode); writeErr != nil {
 				h.log.WithError(writeErr).Error("Failed to write error response")
 			}
 
