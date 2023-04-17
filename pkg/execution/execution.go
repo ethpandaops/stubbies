@@ -79,6 +79,13 @@ func (h *Handler) Request(ctx context.Context, id int, method string, params []*
 		}
 
 		resp.Result = result
+	case "engine_newPayloadV3":
+		result, err := h.newPayload(params)
+		if err != nil {
+			return nil, err
+		}
+
+		resp.Result = result
 	case "eth_getBlockByHash":
 		result, err := h.getBlockByHash(params)
 		if err != nil && err != ErrUnsupportedGetBlockQuery {
